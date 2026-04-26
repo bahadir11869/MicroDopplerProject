@@ -5,7 +5,8 @@
       "Bash(python -c ':*)",
       "Bash(rm -f table2_page.png table2_crop.png engine2_zoom.png)",
       "Bash(python verify_pipeline.py)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Read(//c/Users/celik/OneDrive/Masaüstü/YL/TEL503_Proje/**)"
     ]
   }
 }
