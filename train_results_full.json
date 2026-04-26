@@ -1,0 +1,272 @@
+[
+  {
+    "sigma_p": 0.0,
+    "test_acc_indomain": 1.0,
+    "val_acc": 1.0,
+    "test_loss": 0.0020039406418800353,
+    "cm_indomain": [
+      [
+        150,
+        0
+      ],
+      [
+        0,
+        150
+      ]
+    ],
+    "test_acc_crossdomain": 0.6106666666666667,
+    "cm_crossdomain": [
+      [
+        307,
+        68
+      ],
+      [
+        224,
+        151
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.05,
+    "test_acc_indomain": 1.0,
+    "val_acc": 0.9966666666666667,
+    "test_loss": 0.019294538497924806,
+    "cm_indomain": [
+      [
+        150,
+        0
+      ],
+      [
+        0,
+        150
+      ]
+    ],
+    "test_acc_crossdomain": 0.6346666666666667,
+    "cm_crossdomain": [
+      [
+        292,
+        83
+      ],
+      [
+        191,
+        184
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.1,
+    "test_acc_indomain": 0.8533333333333334,
+    "val_acc": 0.9,
+    "test_loss": 0.34051219940185545,
+    "cm_indomain": [
+      [
+        134,
+        16
+      ],
+      [
+        28,
+        122
+      ]
+    ],
+    "test_acc_crossdomain": 0.648,
+    "cm_crossdomain": [
+      [
+        278,
+        97
+      ],
+      [
+        167,
+        208
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.15,
+    "test_acc_indomain": 0.7166666666666667,
+    "val_acc": 0.7233333333333334,
+    "test_loss": 0.5467877960205079,
+    "cm_indomain": [
+      [
+        112,
+        38
+      ],
+      [
+        47,
+        103
+      ]
+    ],
+    "test_acc_crossdomain": 0.6693333333333333,
+    "cm_crossdomain": [
+      [
+        272,
+        103
+      ],
+      [
+        145,
+        230
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.2,
+    "test_acc_indomain": 0.6433333333333333,
+    "val_acc": 0.6466666666666666,
+    "test_loss": 0.6075066884358724,
+    "cm_indomain": [
+      [
+        98,
+        52
+      ],
+      [
+        55,
+        95
+      ]
+    ],
+    "test_acc_crossdomain": 0.66,
+    "cm_crossdomain": [
+      [
+        235,
+        140
+      ],
+      [
+        115,
+        260
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.25,
+    "test_acc_indomain": 0.61,
+    "val_acc": 0.6366666666666667,
+    "test_loss": 0.6615386962890625,
+    "cm_indomain": [
+      [
+        67,
+        83
+      ],
+      [
+        34,
+        116
+      ]
+    ],
+    "test_acc_crossdomain": 0.6373333333333333,
+    "cm_crossdomain": [
+      [
+        163,
+        212
+      ],
+      [
+        60,
+        315
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.3,
+    "test_acc_indomain": 0.61,
+    "val_acc": 0.6,
+    "test_loss": 0.6856518109639486,
+    "cm_indomain": [
+      [
+        36,
+        114
+      ],
+      [
+        3,
+        147
+      ]
+    ],
+    "test_acc_crossdomain": 0.5826666666666667,
+    "cm_crossdomain": [
+      [
+        67,
+        308
+      ],
+      [
+        5,
+        370
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.4,
+    "test_acc_indomain": 0.5333333333333333,
+    "val_acc": 0.5566666666666666,
+    "test_loss": 0.692966988881429,
+    "cm_indomain": [
+      [
+        18,
+        132
+      ],
+      [
+        8,
+        142
+      ]
+    ],
+    "test_acc_crossdomain": 0.5826666666666667,
+    "cm_crossdomain": [
+      [
+        68,
+        307
+      ],
+      [
+        6,
+        369
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.5,
+    "test_acc_indomain": 0.49666666666666665,
+    "val_acc": 0.5,
+    "test_loss": 0.6929745674133301,
+    "cm_indomain": [
+      [
+        0,
+        150
+      ],
+      [
+        1,
+        149
+      ]
+    ],
+    "test_acc_crossdomain": 0.5,
+    "cm_crossdomain": [
+      [
+        0,
+        375
+      ],
+      [
+        0,
+        375
+      ]
+    ]
+  },
+  {
+    "sigma_p": 0.6,
+    "test_acc_indomain": 0.5,
+    "val_acc": 0.5033333333333333,
+    "test_loss": 0.6919365437825521,
+    "cm_indomain": [
+      [
+        0,
+        150
+      ],
+      [
+        0,
+        150
+      ]
+    ],
+    "test_acc_crossdomain": 0.5,
+    "cm_crossdomain": [
+      [
+        0,
+        375
+      ],
+      [
+        0,
+        375
+      ]
+    ]
+  }
+]

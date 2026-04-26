@@ -1,0 +1,310 @@
+[
+  {
+    "sigma_p": 0.0,
+    "classifiers": {
+      "SVM": {
+        "acc_indomain": 1.0,
+        "acc_crossdomain": 0.6425,
+        "cm_indomain": [
+          [
+            100,
+            0
+          ],
+          [
+            0,
+            100
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            200,
+            0
+          ],
+          [
+            143,
+            57
+          ]
+        ]
+      },
+      "NaiveBayes": {
+        "acc_indomain": 1.0,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            100,
+            0
+          ],
+          [
+            0,
+            100
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            200,
+            0
+          ],
+          [
+            200,
+            0
+          ]
+        ]
+      },
+      "XGBoost": {
+        "acc_indomain": 1.0,
+        "acc_crossdomain": 0.495,
+        "cm_indomain": [
+          [
+            100,
+            0
+          ],
+          [
+            0,
+            100
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            198,
+            2
+          ],
+          [
+            200,
+            0
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "sigma_p": 0.1,
+    "classifiers": {
+      "SVM": {
+        "acc_indomain": 0.905,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            95,
+            5
+          ],
+          [
+            14,
+            86
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            0,
+            200
+          ],
+          [
+            0,
+            200
+          ]
+        ]
+      },
+      "NaiveBayes": {
+        "acc_indomain": 0.685,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            80,
+            20
+          ],
+          [
+            43,
+            57
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            0,
+            200
+          ],
+          [
+            0,
+            200
+          ]
+        ]
+      },
+      "XGBoost": {
+        "acc_indomain": 0.945,
+        "acc_crossdomain": 0.53,
+        "cm_indomain": [
+          [
+            96,
+            4
+          ],
+          [
+            7,
+            93
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            65,
+            135
+          ],
+          [
+            53,
+            147
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "sigma_p": 0.2,
+    "classifiers": {
+      "SVM": {
+        "acc_indomain": 0.59,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            60,
+            40
+          ],
+          [
+            42,
+            58
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            2,
+            198
+          ],
+          [
+            2,
+            198
+          ]
+        ]
+      },
+      "NaiveBayes": {
+        "acc_indomain": 0.64,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            78,
+            22
+          ],
+          [
+            50,
+            50
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            0,
+            200
+          ],
+          [
+            0,
+            200
+          ]
+        ]
+      },
+      "XGBoost": {
+        "acc_indomain": 0.86,
+        "acc_crossdomain": 0.5525,
+        "cm_indomain": [
+          [
+            88,
+            12
+          ],
+          [
+            16,
+            84
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            110,
+            90
+          ],
+          [
+            89,
+            111
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "sigma_p": 0.3,
+    "classifiers": {
+      "SVM": {
+        "acc_indomain": 0.645,
+        "acc_crossdomain": 0.52,
+        "cm_indomain": [
+          [
+            49,
+            51
+          ],
+          [
+            20,
+            80
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            195,
+            5
+          ],
+          [
+            187,
+            13
+          ]
+        ]
+      },
+      "NaiveBayes": {
+        "acc_indomain": 0.585,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            68,
+            32
+          ],
+          [
+            51,
+            49
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            0,
+            200
+          ],
+          [
+            0,
+            200
+          ]
+        ]
+      },
+      "XGBoost": {
+        "acc_indomain": 0.8,
+        "acc_crossdomain": 0.5,
+        "cm_indomain": [
+          [
+            78,
+            22
+          ],
+          [
+            18,
+            82
+          ]
+        ],
+        "cm_crossdomain": [
+          [
+            32,
+            168
+          ],
+          [
+            32,
+            168
+          ]
+        ]
+      }
+    }
+  }
+]

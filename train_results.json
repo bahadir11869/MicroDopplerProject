@@ -1,0 +1,29 @@
+[
+  {
+    "sigma_p": 0.2,
+    "test_acc_indomain": 0.61,
+    "val_acc": 0.615,
+    "test_loss": 0.6925430488586426,
+    "cm_indomain": [
+      [
+        70,
+        30
+      ],
+      [
+        48,
+        52
+      ]
+    ],
+    "test_acc_crossdomain": 0.5,
+    "cm_crossdomain": [
+      [
+        250,
+        0
+      ],
+      [
+        250,
+        0
+      ]
+    ]
+  }
+]

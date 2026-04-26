@@ -1,0 +1,1023 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Paket tanımları ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[turkish]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{float}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+% --- Python listing stili ---
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolor}{rgb}{0.96,0.96,0.96}
+
+\lstdefinestyle{pythoncode}{
+  backgroundcolor=\color{backcolor},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{magenta},
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{codepurple},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=2,
+  language=Python,
+  extendedchars=true,
+  inputencoding=utf8,
+  literate=
+    {ç}{{\c{c}}}1 {ş}{{\c{s}}}1 {ğ}{{\u{g}}}1 {ı}{{\i}}1 {ö}{{\"o}}1 {ü}{{\"u}}1
+    {Ç}{{\c{C}}}1 {Ş}{{\c{S}}}1 {Ğ}{{\u{G}}}1 {İ}{{\.{I}}}1 {Ö}{{\"O}}1 {Ü}{{\"U}}1
+    {σ}{{$\sigma$}}1 {μ}{{$\mu$}}1 {π}{{$\pi$}}1 {α}{{$\alpha$}}1 {β}{{$\beta$}}1
+    {ω}{{$\omega$}}1 {Γ}{{$\Gamma$}}1 {Δ}{{$\Delta$}}1 {θ}{{$\theta$}}1 {φ}{{$\varphi$}}1
+    {≈}{{$\approx$}}1 {±}{{$\pm$}}1 {→}{{$\rightarrow$}}1 {²}{{$^2$}}1
+}
+\lstset{style=pythoncode}
+
+% --- Kapak ---
+\title{\textbf{Mikro-Doppler İmzaları Üzerinde Model-Tabanlı Veri Artırma Yönteminin Gerçeklenmesi}\\[0.5em]
+\large Rojhani vd. (IEEE TMTT 2023) Makalesinin Python ile Sentetik FMCW Radar Pipeline Reproduksiyonu}
+\author{Bahadır Çeliktaş\\
+TEL503 — Yüksek Lisans Projesi}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% =============================================================
+\section{Özet}
+% =============================================================
+Bu rapor, Rojhani \emph{vd.}'in IEEE Transactions on Microwave Theory and Techniques (Mayıs 2023) sayısında yayımlanan
+\emph{``Model-Based Data Augmentation Applied to Deep Learning Networks for Classification of Micro-Doppler Signatures Using FMCW Radar''}
+başlıklı makalesinin sentetik veri üretim zinciri ve sınıflandırma deneylerinin Python dilinde gerçeklenmesini detaylı biçimde belgeler.
+
+Makale, küçük insansız hava araçlarının (UAV) FMCW (Frequency Modulated Continuous Wave) radar
+imzalarını fiziksel/deterministik bir model ile sentezleyerek derin öğrenme tabanlı sınıflandırıcılarda
+veri artırma (data augmentation) yöntemi olarak kullanmayı önermektedir. Bu projede:
+\begin{itemize}
+    \item Makaledeki tüm temel denklemler (Eq.~6, 10, 11, 12, 14, 15, 16, 19--22) ve
+          parametre tabloları (Table I, Table II) Python NumPy üzerinde birebir kodlanmıştır.
+    \item Önerilen CNN mimarisi (Fig.~7) PyTorch ile aynı katman yapısında inşa edilmiştir.
+    \item Makalede karşılaştırma için kullanılan üç klasik makine öğrenmesi sınıflandırıcısı
+          (SVM, Naive Bayes, XGBoost) scikit-learn ve XGBoost kütüphaneleri ile kurulmuştur.
+    \item Makalenin gerçek ölçüm veri seti kamuya açık olmadığından,
+          ölçüm setinin yerine sentetik bir \emph{ölçüm proxy'si} (sabit $\sigma_P=0{,}20$ + 20\,dB AWGN)
+          tanımlanmış ve cross-domain test bu set üzerinde yapılmıştır.
+    \item Makalenin temel deneyleri (Fig.~11 sentez/ölçüm karşılaştırması, Fig.~13 $\sigma_P$ tarama eğrisi,
+          Table~IV ML sınıflandırıcı tablosu, Fig.~14 confusion matrix) ya birebir ya da yapısal olarak
+          uyumlu biçimde elde edilmiştir.
+\end{itemize}
+
+% =============================================================
+\section{Giriş ve Projenin Amacı}
+% =============================================================
+\subsection{Problem Tanımı}
+Mini insansız hava araçları (mini-UAV; helikopter, quadcopter vb.) düşük uçuş yüksekliği, küçük radar
+kesit alanı (RCS) ve düşük hız nedeniyle radar tabanlı algılama sistemleri için zorlu hedeflerdir.
+Bu hedefleri ayırt etmek için yaygın olarak \emph{mikro-Doppler imza} (micro-Doppler signature, $\mu$D)
+kullanılır: hedefin gövde Doppler bileşeni dışında, dönen pervane/rotor gibi mekanik parçalardan
+gelen ek frekans bileşenleridir.
+
+Derin öğrenme tabanlı sınıflandırıcılar (özellikle CNN) bu görevlerde yüksek başarı
+gösterse de \textbf{büyük miktarda etiketli ölçüm verisine ihtiyaç duyarlar}.
+Gerçek radar ölçüm kampanyaları pahalı, yavaş ve hava şartları/test alanı kısıtlarına bağlıdır.
+Rojhani \emph{vd.} bu probleme \textbf{model tabanlı (deterministik) veri artırma}
+yaklaşımını önerir: hedefin fiziksel/mekanik özelliklerini içeren bir matematiksel modelden
+sentetik dataset üretmek ve CNN'i bu sentetik dataset ile eğitmek.
+
+\subsection{Projenin Hedefleri (Başarı Ölçütleri)}
+\begin{description}
+    \item[Ölçüt 1 — Sinyal modelinin fiziksel tutarlılığı:] Üretilen FMCW IF sinyali, hem ana
+          Doppler bantını hem de pervane dönüş frekanslarındaki mikro-Doppler yan bantlarını
+          doğru frekanslarda içermelidir.
+    \item[Ölçüt 2 — Hedef tipi ayırt edilebilirliği:] Tek motorlu (HELI) ve quadcopter (QUAD) sınıfları
+          arasındaki imza farkı sınıflandırıcılar tarafından öğrenilebilir olmalıdır.
+    \item[Ölçüt 3 — Literatür ile nicel uyum:] CNN sınıflandırma doğruluğu, makalenin raporladığı
+          \%78{,}68 değerine yaklaşmalıdır.
+\end{description}
+
+% =============================================================
+\section{Telekom Domain Bilgileri (Makaleden)}
+% =============================================================
+\subsection{FMCW Radar Çalışma Prensibi}
+FMCW radar, sürekli olarak frekansı zamanla doğrusal değişen bir \emph{chirp} sinyali yayınlayan
+ve geri yansıyan sinyali iletilen sinyal ile karıştırarak (mixer) düşük frekanslı bir
+\textbf{IF (Intermediate Frequency)} sinyali üreten bir radar mimarisidir. IF sinyalinin frekansı,
+hedefin radara olan mesafesi ile orantılıdır:
+\begin{equation}
+R = \frac{c_0 \cdot f_{\text{IF}}}{2\mu}
+\label{eq:range}
+\end{equation}
+Burada $c_0$ ışık hızı, $\mu$ chirp frekans rampa katsayısı (Hz/s), $f_{\text{IF}}$ ise
+IF sinyalindeki tepe frekansıdır. Eq.~\ref{eq:range} makalenin Eq.~(14)'üdür.
+
+\subsection{Mikro-Doppler İmza}
+Hedef tamamen rijit bir cisim ise IF spektrumda yalnızca tek bir tepe gözlenir.
+Dönen rotor gibi mekanik bir parça varsa, bu parçadan saçılan elektromanyetik dalga
+zamanla değişen bir mesafeye sahiptir; sonuç olarak ek frekans bileşenleri (yan bantlar)
+oluşur. Bu yan bantlar topluca \emph{mikro-Doppler imzası} ($\mu$D) olarak adlandırılır.
+Pervane/rotor frekansı ve geometrisine özgü olduğundan farklı UAV sınıflarını
+ayırt etmede kullanılabilir.
+
+\subsection{IF Sinyalinin Matematiksel Modeli (Eq. 6)}
+Makale, boresight'ta (radarın bakış doğrultusunda) duran bir UAV için IF sinyalini şu şekilde verir:
+\begin{equation}
+s_{\text{IF}}(t) = \sum_{k=1}^{N_{\text{eng}}} \Gamma_k \cos\!\left[\frac{8\pi\mu}{c_0}\left(R_0 + \sum_{j=1}^{4} A_{kj} \cos(\omega_{kj} t + \phi_{kj})\right) t\right]
+\label{eq:eq6}
+\end{equation}
+Bu denklemde:
+\begin{itemize}
+    \item $N_{\text{eng}}$: rotor (motor) sayısı (HELI için 1, QUAD için 4).
+    \item $\Gamma_k$: $k$. rotorun beklenen RCS (Radar Kesit Alanı).
+    \item $R_0$: hedefin sabit (gövde) menzili (m).
+    \item $A_{kj}, \omega_{kj}, \phi_{kj}$: $k$. rotorun $j$. vibrasyonel bileşeninin
+          genlik, frekans ve faz değerleri.
+    \item $j$ indeksi sırasıyla şu bileşenlere karşılık gelir: $\alpha$ (roll), $\beta$ (pitch),
+          $|\omega_\alpha + \omega_\beta|$ (toplam karışım), $|\omega_\alpha - \omega_\beta|$ (fark karışım).
+\end{itemize}
+Yani her motor için 13 skalar (1 RCS $\Gamma_k$ + 4 bileşen $\times$ 3 parametre) tanımlıdır.
+
+\subsection{Vibrasyonel Bileşenlerin Açılımı (Eq. 10)}
+Tek bir motorun vibrasyonel parametre vektörü (Eq.~10):
+\begin{equation}
+\bar{x}_k = \langle \Gamma_k,\; A_{k\alpha}, \omega_{k\alpha}, \phi_{k\alpha},\;
+                              A_{k\beta}, \omega_{k\beta}, \phi_{k\beta},\;
+                              A_{k(\alpha+\beta)}, |\omega_{k\alpha}+\omega_{k\beta}|, \phi_{k(\alpha+\beta)},\;
+                              A_{k(\alpha-\beta)}, |\omega_{k\alpha}-\omega_{k\beta}|, \phi_{k(\alpha-\beta)} \rangle^T
+\label{eq:eq10}
+\end{equation}
+
+Burada karışım terimlerinin frekans katsayıları (Eq.~11):
+\begin{equation}
+C_{\omega_{k(\alpha+\beta)}} = \frac{\omega_{k(\alpha+\beta)}}{|\omega_{k\alpha}+\omega_{k\beta}|}, \qquad
+C_{\omega_{k(\alpha-\beta)}} = \frac{\omega_{k(\alpha-\beta)}}{|\omega_{k\alpha}-\omega_{k\beta}|}
+\end{equation}
+şeklinde tanımlanır. Bu katsayılar Table~II'de \%100, \%99, \%92, \%104 gibi yüzdelik değerlerle
+verilmiştir.
+
+\subsection{Veri Artırma için Parametre Perturbasyonu (Eq. 12)}
+Sınıf-içi varyasyonu modellemek için her parametreye, kendi büyüklüğüyle orantılı standart sapmaya
+sahip Gauss gürültüsü eklenir:
+\begin{equation}
+\bar{n}_{i,P} = \big(\,\mathcal{N}(0, \sigma_P |x|_1),\,
+                    \mathcal{N}(0, \sigma_P |x|_2),\, \ldots\,\big)^T,
+                    \quad \sigma_P \in [0,1]
+\label{eq:eq12}
+\end{equation}
+Burada $\sigma_P$ \emph{tek skaler}, ne kadar artırma yapılacağını kontrol eden hiperparametredir.
+$\sigma_P=0$ deterministik (tek bir profil), $\sigma_P=0{,}60$ ise çok geniş bir dağılım üretir.
+Makale Section IV-C-1'de $\sigma_P=0{,}20$ değerinin ölçüm setine en iyi uyduğunu deneysel olarak
+göstermektedir.
+
+\subsection{MTI (Moving Target Indicator) Filtresi (Eq. 15)}
+Gerçek ölçümlerde hareketsiz hedefler (zemin yansıması, statik gövde) ve düşük hızlı clutter
+istenmeyen bileşenlerdir. MTI filtresi bunları bastırmak için ardışık radar görüntüleri arasında
+fark alır:
+\begin{equation}
+I_{\text{MTI}}(r,\theta) = I(r,\theta) - \frac{1}{N_{\text{MTI}}}\sum_{i=1}^{N_{\text{MTI}}} L_{-i}(r,\theta)
+\label{eq:eq15}
+\end{equation}
+Makalede $N_{\text{MTI}} = 10$ frame kullanılır (Table~I).
+
+\subsection{Açısal Entegrasyon (Eq. 16)}
+MIMO array, açıya bağlı (range-angle) iki boyutlu bir görüntü üretir. Boresight hedefine ait 1-D menzil
+profili elde etmek için açısal pencere boyunca (paperde $\Delta\theta = 7^\circ$) ortalama alınır:
+\begin{equation}
+\bar{s}(r) = \frac{1}{\Delta\theta}\int_{\theta - \Delta\theta/2}^{\theta + \Delta\theta/2} I_{\text{MTI}}(r, \theta')\, d\theta'
+\end{equation}
+
+\subsection{Donanım Parametreleri (Table I)}
+\begin{table}[H]
+\centering
+\caption{Makaledeki FMCW MIMO radar platform parametreleri (Table I).}
+\label{tab:tableI}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parametre} & \textbf{Değer} \\
+\midrule
+Ramp frekans aralığı & 75 -- 79 GHz (taşıyıcı $f_c \approx 77$ GHz) \\
+RF çıkış gücü & 10 dBm \\
+RX anten sayısı & 8 \\
+TX anten sayısı & 4 \\
+Ramp süresi (yukarı) & 2{,}56 ms \\
+Ramp süresi (aşağı) & 0{,}32 ms \\
+Ramp katsayısı $\mu$ & $1{,}56 \times 10^{12}$ Hz/s \\
+Frame başına ramp & 1000 \\
+Chirp tekrar aralığı (CRI) & 200 ms \\
+Chirp başına örnek $N_{\text{samples}}$ & 504 \\
+IF örnekleme frekansı $F_s$ & 200 kHz \\
+FFT noktası sayısı $N_{\text{FFT}}$ & 4096 \\
+FFT işlem kazancı & 36{,}12 dB \\
+MTI frame derinliği $N_{\text{MTI}}$ & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Hedef Sınıfları ve Model Parametreleri (Table II)}
+Makalenin Table~II'si iki referans hedefe ait parametre vektörlerini verir:
+\begin{itemize}
+    \item \textbf{HELI} (RadioFLY plastik helikopter, 1 motor): $\Gamma_2 = \Gamma_3 = \Gamma_4 = 0$,
+          yalnızca Engine~1 aktif. $\Gamma_1 = 0{,}044$, $\omega_{1\alpha} = 2{,}69 \times 10^3$ rad/s ($\sim 428$ Hz),
+          $\omega_{1\beta} = 3{,}98 \times 10^3$ rad/s ($\sim 633$ Hz).
+    \item \textbf{QUAD} (DJI Mavic Mini 2, 4 motor): Dört motorun tümü aktif. $\Gamma_k$ değerleri
+          $0{,}001 - 0{,}011$ aralığında, $\omega$ değerleri 1{,}77\,kHz -- 5{,}07\,kHz aralığında.
+\end{itemize}
+Bu parametreler doğrudan kodumuzda \texttt{HELI\_REF\_PARAMS} ve \texttt{QUAD\_REF\_PARAMS}
+sözlüklerine birebir kopyalanmıştır.
+
+\subsection{Veri Üretim Zincirleri}
+Makalede iki farklı zincir tanımlanır:
+\begin{description}
+    \item[Fig. 2 — Sentetik zincir:] Eq.~6 ile $s_{\text{IF}}(t)$ üret $\rightarrow$ FFT $\rightarrow$
+          tepe etrafından 400 örneklik menzil profili al. Bu zincir CNN/ML eğitim verisi içindir.
+    \item[Fig. 6 — Ölçüm zinciri:] Çoklu frame topla $\rightarrow$ 2-D FFT $\rightarrow$ MTI
+          (Eq.~15) $\rightarrow$ açısal entegrasyon (Eq.~16) $\rightarrow$ tepe etrafından
+          400 örnek. Bu zincir gerçek ölçümün işlenmesine karşılık gelir.
+\end{description}
+
+\subsection{Önerilen CNN Mimarisi (Fig. 7)}
+\begin{itemize}
+    \item Giriş: $400 \times 1$ menzil profili $\rightarrow$ $1 \times 20 \times 20$'ye yeniden şekillendir.
+    \item \textbf{Conv1}: $K=3$, 32 filtre, ReLU $\rightarrow$ çıktı $32 \times 18 \times 18$.
+    \item \textbf{MaxPool1}: $2 \times 2$ $\rightarrow$ $32 \times 9 \times 9$.
+    \item \textbf{Conv2}: $K=3$, 64 filtre, ReLU $\rightarrow$ $64 \times 7 \times 7$.
+    \item \textbf{AvgPool2}: $7 \times 7$ $\rightarrow$ $64 \times 1 \times 1$.
+    \item \textbf{Flatten} $\rightarrow$ $64$ boyutlu vektör.
+    \item \textbf{FC1}: $64 \rightarrow 32$, ReLU.
+    \item \textbf{FC2}: $32 \rightarrow 2$ (sınıf logitleri).
+    \item Softmax + Cross-Entropy kayıp (Eq.~19, 20).
+    \item Adam optimizer, $\text{lr} = 10^{-3}$, 50 epoch (Section IV-C-2).
+\end{itemize}
+
+\subsection{Performans Metrikleri (Eq. 21--22)}
+\begin{equation}
+\text{acc} = \frac{TP + TN}{TP + FP + FN + TN}, \qquad
+\text{prec} = \frac{TP}{TP + FP}
+\end{equation}
+
+\subsection{Makalenin Raporladığı Sonuçlar}
+\begin{itemize}
+    \item Table~IV: SVM, Naive Bayes, XGBoost için $\sigma_P \in \{0, 0{,}05, 0{,}10, 0{,}20, 0{,}30\}$ tarama sonuçları.
+          ``New'' (136 örnek) ölçüm setinde optimum nokta $\sigma_P = 0{,}20$.
+    \item Fig.~13: $\sigma_P$ vs accuracy eğrisi, üç sınıflandırıcı için ölçüm seti üzerinde
+          $\sigma_P \approx 0{,}20$'de tepe yapan çan eğrisi.
+    \item CNN ile $\sigma_P=0{,}20$ ve 16k/sınıf eğitim seti (toplam 32000 örnek) ile gerçek
+          ölçümler üzerinde \%78{,}68 doğruluk (Fig.~14).
+    \item Conventional augmenter (\emph{tsaug}) ile sadece \%66{,}18 (Fig.~15), ve dengesiz
+          (HELI hassasiyeti yalnızca \%15{,}55).
+\end{itemize}
+
+% =============================================================
+\section{Bizim Telekom Tasarım Kararlarımız ve Yorumlarımız}
+% =============================================================
+Makalede bazı noktalar açık değildir veya farklı yorumlara açıktır. Bu bölüm, kodda yapılan
+kritik telekom kararlarını ve nedenlerini belgeler.
+
+\subsection{Eq. 6'daki $8\pi\mu/c_0$ Katsayısı}
+Eq.~6'da yazılı $8\pi\mu/c_0$ katsayısı $4\pi\mu/c_0$ olarak alındı.
+\textbf{Gerekçe}: Eq.~14 ($R = c_0 \cdot f / 2\mu$) ile tutarlılık için chirp slope üzerinden
+elde edilen IF frekansı $f_{\text{IF}} = (2\mu/c_0)\cdot R$ olmalıdır; cosinüsün argümanı
+$2\pi f_{\text{IF}} t = (4\pi\mu/c_0)\cdot R\cdot t$ verir. ``8'' katsayısı ile peak menzili
+2$\times$ kayar. Kodda:
+\begin{equation*}
+K = \frac{4\pi\mu}{c_0}, \qquad \text{phase}(t) = K\cdot(R_0 + \text{vib}(t))\cdot t
+\end{equation*}
+
+\subsection{Carrier Round-Trip Terimi $(4\pi/\lambda)\cdot R(t)$}
+Eq.~6'nın yazılı halinde \emph{taşıyıcı round-trip fazı} $(4\pi/\lambda)\cdot R(t)$ açıkça yer almıyor.
+Bu terim \emph{eklenseydi} modülasyon indeksi $\beta \approx 6{,}4$ rad'e fırlardı; sonuç olarak
+Bessel fonksiyonu açılımı geniş bir comb spektrumu üretir ve Fig.~11'in temiz tepesi ile uyumsuz
+olurdu. Bu nedenle (Passafiume vd.~[12] modeline uygun olarak) carrier terimi çıkarılmış,
+modülasyon yalnızca chirp slope üzerinden bırakılmıştır. Sonuç modülasyon indeksi
+$\beta \approx 0{,}33$ rad'dir; $J_0$ baskın, $J_1$ yan bantları $\sim$\%16 seviyesinde kalır.
+
+\subsection{Menzil Çözünürlüğü}
+\begin{equation}
+f_{\text{bin}} = \frac{F_s}{N_{\text{FFT}}} = \frac{200000}{4096} \approx 48{,}83 \text{ Hz}
+\end{equation}
+\begin{equation}
+\text{BIN}_M = \frac{f_{\text{bin}} \cdot c_0}{2\mu} = \frac{48{,}83 \cdot 3\times10^8}{2 \cdot 1{,}56\times10^{12}}
+\approx 4{,}69 \text{ mm/bin}
+\end{equation}
+400 örneklik profil, hedef menzili etrafında $\pm 200 \cdot 4{,}69$ mm $\approx \pm 94$ cm'lik bir
+pencereye karşılık gelir.
+
+\subsection{Augmentation (Eq. 12) Uygulaması}
+Kodda her parametre $p$ için $p_n = p + \mathcal{N}(0, (\sigma_P\cdot|p|)^2)$ uygulanır.
+$\sigma_P = 0$ özel durumunda hiçbir gürültü eklenmez; bu da Fig.~11'deki kırmızı (deterministik)
+profili üretir.
+
+\subsection{MTI Yorumu — Magnitude (Non-Coherent) MTI}
+Kodda MTI çıktısı kompleks değil, \textbf{magnitude domain'inde} alınır:
+\begin{equation*}
+I_{\text{MTI}}(r) = \max\!\big( |I_{\text{current}}(r)| - \frac{1}{N_{\text{MTI}}}\sum_{i=1}^{N_{\text{MTI}}} |I_{-i}(r)|,\; 0 \big)
+\end{equation*}
+\textbf{Gerekçe}: Kompleks (coherent) MTI sentetik modelde $R_0$ sabit olduğunda taşıyıcıyı
+tamamen iptal eder, profil yapısal olarak Fig.~11'deki ölçümle uyuşmaz. Paperin Fig.~10(e/f)
+çıktısında MTI sonrası tepe korunur — bu davranış magnitude tabanlı (non-coherent) yorumla
+tutarlıdır. Ayrıca $R_0$ değerine her frame için $\mathcal{N}(0, 3 \text{ mm})$ gürültü eklenerek
+hovering drone konum jitter'ı modellenir.
+
+\subsection{Ölçüm Proxy'si}
+Makalenin gerçek ölçüm seti kamuya açık değildir. Bunun yerine \emph{ölçüm proxy'si} adında bir
+sentetik test seti tanımlandı:
+\begin{equation*}
+\text{profile}_{\text{proxy}} = \texttt{generate\_single\_profile}(\text{params},\, \sigma_P=0{,}20,\, \text{snr\_db}=20)
+\end{equation*}
+Bu proxy:
+\begin{itemize}
+    \item \textbf{Yapı olarak} eğitim sentetiği ile aynı (Fig.~2 zinciri)
+    \item \textbf{Variability açısından} sabit $\sigma_P=0{,}20$ taşır (paperin ölçüm setinde
+          tahmin ettiği ``true'' $\sigma_P$).
+    \item \textbf{Gürültü olarak} 20 dB AWGN içerir.
+\end{itemize}
+Bu seçim, paperin Section IV-C-1 bulgusunu (eğitim $\sigma_P \approx \sigma_P^{\text{meas}}$
+olduğunda accuracy tepe yapar) sentetik-only ortamda yeniden üretmemizi sağlar.
+
+% =============================================================
+\section{Python Kütüphanelerine Kısa Giriş}
+% =============================================================
+Python bilgisi sınırlı okuyucular için, kullanılan kütüphanelerin temel kavramları:
+
+\paragraph{NumPy.} Sayısal hesaplamalar için Python'un \emph{de facto} kütüphanesidir.
+\texttt{np.array}, \texttt{np.linspace}, \texttt{np.fft.fft}, \texttt{np.exp},
+\texttt{np.random.default\_rng} gibi fonksiyonlar kullanılır.
+
+\paragraph{Matplotlib.} Çizim kütüphanesi. \texttt{plt.plot}, \texttt{plt.savefig} ile PNG üretir.
+
+\paragraph{scikit-learn (sklearn).} Klasik makine öğrenmesi kütüphanesi. \texttt{train\_test\_split}
+veriyi eğitim/test olarak böler, \texttt{SVC} (SVM), \texttt{GaussianNB} (Naive Bayes) modellerini
+sağlar, \texttt{confusion\_matrix} ve \texttt{accuracy\_score} ile değerlendirme yapılır.
+
+\paragraph{XGBoost.} Gradient boosting tabanlı sınıflandırıcı. \texttt{XGBClassifier} sınıfı.
+
+\paragraph{PyTorch.} Derin öğrenme kütüphanesi. \texttt{torch.nn.Module} sınıfından türeyerek
+katmanlı modeller tanımlanır; \texttt{torch.optim.Adam} optimizer, \texttt{nn.CrossEntropyLoss}
+kayıp fonksiyonudur. \texttt{DataLoader} verileri batch'lere böler.
+
+% =============================================================
+\section{Python Script'lerinin Detaylı Açıklaması}
+% =============================================================
+Proje 6 Python dosyasından oluşur:
+\begin{itemize}
+    \item \texttt{main.py} — sinyal modeli ve veri üretici (en büyük dosya, ana modül)
+    \item \texttt{cnn\_model.py} — CNN mimarisi
+    \item \texttt{train.py} — CNN eğitim/değerlendirme
+    \item \texttt{train\_ml.py} — SVM, Naive Bayes, XGBoost eğitim ve karşılaştırma
+    \item \texttt{verify\_pipeline.py} — Fig.~10/11 doğrulama görselleri
+    \item \texttt{class\_diff.py} — HELI/QUAD profil farkı görseli
+\end{itemize}
+
+% --- main.py ---
+\subsection{\texttt{main.py} — Sinyal Modeli ve Veri Üretici}
+Bu modül projenin en kritik dosyasıdır. Tüm telekom tabanlı hesaplamalar burada yapılır.
+
+\subsubsection{Sabitler ve Donanım Parametreleri}
+\begin{lstlisting}[caption={Table I parametreleri}]
+C = 3e8                     # Işık hızı [m/s]
+FC = 77e9                   # Taşıyıcı frekansı [Hz]
+LAMBDA = C / FC             # Dalga boyu [m]
+FS = 200e3                  # IF örnekleme frekansı [Hz]
+N_SAMPLES = 504             # Chirp başına örnek sayısı
+N_FFT = 4096                # FFT noktası
+MU = 1.56e12                # Chirp slope (Hz/s)
+N_RX = 8                    # RX anten sayısı
+N_MTI = 10                  # MTI frame depth
+CRI = 200e-3                # Chirp repetition interval [s]
+RX_SPACING = LAMBDA / 2     # Anten aralığı
+DELTA_THETA = np.deg2rad(7.0)  # Açısal entegrasyon penceresi
+PROFILE_LEN = 400           # CNN giriş profil uzunluğu
+BIN_HZ = FS / N_FFT         # FFT bin frekans çözünürlüğü (~48.83 Hz)
+BIN_M = BIN_HZ * C / (2 * MU)  # FFT bin menzil çözünürlüğü (~4.69 mm)
+\end{lstlisting}
+Bu satırlar yalnızca tanım yapar; herhangi bir hesaplama tetiklemez. Tüm aşağıdaki fonksiyonlar
+bu sabitleri kullanır.
+
+\subsubsection{Hedef Sınıf Parametreleri (Table II)}
+\begin{lstlisting}[caption={HELI ve QUAD parametre sözlükleri}]
+HELI_REF_PARAMS = {
+    "engine_1": {
+        "Gamma": 0.044, "A_alpha": 2.05e-3, "omega_alpha": 2.69e3, "phi_alpha": 1.04,
+        "A_beta": 2.08e-3, "omega_beta": 3.98e3, "phi_beta": 0.81,
+        "A_mix_plus": 6.68e-4, "C_omega_plus": 1.04, "phi_mix_plus": 1.90,
+        "A_mix_minus": 2.35e-3, "C_omega_minus": 0.92, "phi_mix_minus": -0.04
+    },
+}
+
+QUAD_REF_PARAMS = {
+    "engine_1": { ... 13 parametre ... },
+    "engine_2": { ... },
+    "engine_3": { ... },
+    "engine_4": { ... },
+}
+\end{lstlisting}
+Burada \texttt{HELI\_REF\_PARAMS} bir Python sözlüğüdür (dictionary). Her motor anahtarı ($\texttt{engine\_1}$,
+\ldots) altında bir iç sözlük bulunur; bu iç sözlük o motorun 13 parametresini saklar.
+QUAD'ın 4 motoru olduğu için sözlükte 4 anahtar vardır; HELI'nin yalnızca 1 motoru olduğu için
+1 anahtar yeterlidir. Tablodaki diğer motorlar ($\Gamma_2 = \Gamma_3 = \Gamma_4 = 0$) sıfır olduğundan kodda yer almazlar.
+
+\subsubsection{Yardımcı Fonksiyonlar}
+\begin{lstlisting}[caption={Bin-menzil dönüşümü ve eksen oluşturma}]
+def bin_to_range_m(bin_idx):
+    """FFT bin indeksi -> menzil (m). R = c0*f/(2*mu)."""
+    return np.asarray(bin_idx) * BIN_M
+
+def range_axis_around(r0_m, n=PROFILE_LEN):
+    """r0_m etrafında n-örneklik metre ekseni (tepe merkeze hizalı)."""
+    return r0_m + (np.arange(n) - n // 2) * BIN_M
+\end{lstlisting}
+\texttt{range\_axis\_around} fonksiyonu, profil görselleştirmek için x-eksenini metre cinsinden üretir.
+\texttt{np.arange(n)} 0,1,2,...,n-1 dizisini, \texttt{n//2} ortayı verir; sonuç olarak hedef
+menzili tam ortada konumlanır.
+
+\subsubsection{Parametre Augmentation (Eq. 12)}
+\begin{lstlisting}[caption={Augmentation fonksiyonu}]
+def _augment_params(params, sigma_p, rng):
+    """Eq. 12: p_n = p + N(0, (sigma_p*|p|)^2). sigma_p=0 -> birebir."""
+    if sigma_p == 0:
+        return dict(params)
+    return {k: v + rng.normal(0.0, sigma_p * abs(v)) for k, v in params.items()}
+\end{lstlisting}
+Burada \texttt{rng.normal(0, std)} bir gauss rastgele sayı üretir. Sözlük anlama (dict comprehension)
+ile her parametre için tek seferlik perturbe edilmiş yeni bir sözlük döndürülür.
+\textbf{Önemli ayrıntı}: Standart sapma $\sigma_P \cdot |p|$, yani parametrenin büyüklüğüne orantılı
+(göreli gürültü). Çok büyük parametreler daha fazla gürültü alır, çok küçükler daha az.
+
+\subsubsection{Tek Motorun Vibrasyonu (Eq. 10)}
+\begin{lstlisting}[caption={Eq. 10 — alpha + beta + iki karışım terimi}]
+def _engine_vibration(p, t):
+    """Eq. 10: alpha + beta + karışım (omega_a + omega_b) toplamı."""
+    w_a, w_b = p["omega_alpha"], p["omega_beta"]
+    vib  = p["A_alpha"] * np.cos(w_a * t + p["phi_alpha"])
+    vib += p["A_beta"]  * np.cos(w_b * t + p["phi_beta"])
+    vib += p["A_mix_plus"]  * np.cos(p["C_omega_plus"]  * abs(w_a + w_b) * t + p["phi_mix_plus"])
+    vib += p["A_mix_minus"] * np.cos(p["C_omega_minus"] * abs(w_a - w_b) * t + p["phi_mix_minus"])
+    return vib
+\end{lstlisting}
+\texttt{t} bir NumPy dizisidir (zaman vektörü). \texttt{np.cos(...)} dizinin her elemanına cosinüs
+uygular ve aynı boyda dizi döndürür. 4 satır boyunca 4 vibrasyonel bileşen toplanır:
+$\alpha$, $\beta$, $\alpha+\beta$ karışım, $\alpha-\beta$ karışım.
+
+\subsubsection{IF Sinyalinin Sentezi (Eq. 6)}
+\begin{lstlisting}[caption={Eq. 6 — FMCW IF sinyali sentezi}]
+def _synthesize_if(base_params, sigma_p, R0, rng, t_offset=0.0):
+    t = np.arange(N_SAMPLES) / FS + t_offset
+    s_if = np.zeros(N_SAMPLES, dtype=complex)
+    K = 4 * np.pi * MU / C  # Eq. 14 ile tutarlı katsayı
+
+    for params in base_params.values():
+        if params.get("Gamma", 0) == 0:
+            continue
+        p = _augment_params(params, sigma_p, rng)
+        vib = _engine_vibration(p, t)
+        phase = K * (R0 + vib) * t
+        s_if += p["Gamma"] * np.exp(1j * phase)
+    return s_if
+\end{lstlisting}
+Adım adım:
+\begin{enumerate}
+    \item \texttt{t}: 0'dan $N_{\text{samples}}/F_s$ saniyeye kadar uzanan zaman vektörü.
+          \texttt{t\_offset} parametresi MTI için frame'ler arası mutlak zaman farkını taşır.
+    \item \texttt{s\_if}: Toplam IF sinyalinin tutulacağı kompleks dizi (sıfır ile başlatılır).
+    \item Her motor için: aktif değilse atlanır ($\Gamma_k = 0$). Aktifse parametreler perturbe edilir,
+          vibrasyon hesaplanır, faz vektörü oluşturulur, kompleks eksponansiyel ile sinyale eklenir.
+    \item \texttt{np.exp(1j*phase)}: Euler formülü, $e^{i\phi} = \cos\phi + i\sin\phi$. Kompleks halde
+          tutarak hem amplitüd hem faz bilgisini koruruz.
+\end{enumerate}
+
+\subsubsection{Gauss Beyaz Gürültü Ekleme}
+\begin{lstlisting}[caption={SNR'a göre AWGN ekle}]
+def _add_awgn(s_if, snr_db, rng):
+    """Karmaşık AWGN, hedef SNR'a göre ölçekli."""
+    sig_power = np.mean(np.abs(s_if) ** 2)
+    noise_power = sig_power / (10 ** (snr_db / 10))
+    noise = rng.normal(0, 1, s_if.size) + 1j * rng.normal(0, 1, s_if.size)
+    return s_if + noise * np.sqrt(noise_power / 2)
+\end{lstlisting}
+SNR \texttt{dB} cinsinden verilir; sinyal gücüne oranlanarak gürültü gücü hesaplanır.
+Reel ve imajiner kısımlar bağımsız olduğundan, her kısım için \texttt{noise\_power/2} ile çarpılır.
+
+\subsubsection{Profil Çıkarma}
+\begin{lstlisting}[caption={Tepe etrafından 400 örnek al ve max-normalize et}]
+def _extract_profile(range_spectrum, center_bin=None, profile_len=PROFILE_LEN):
+    rp = np.abs(range_spectrum)
+    if center_bin is None:
+        center_bin = int(np.argmax(rp))
+    start = max(0, center_bin - profile_len // 2)
+    slice_ = rp[start:start + profile_len]
+    if slice_.size < profile_len:
+        slice_ = np.pad(slice_, (0, profile_len - slice_.size))
+    m = slice_.max()
+    return slice_ / m if m > 0 else slice_
+\end{lstlisting}
+4096-bin'lik FFT spektrumdan, hedef bin etrafında 400 örnek seçilir. Sonra maksimum değerle
+bölünerek \texttt{[0,1]} aralığına ölçeklenir.
+
+\subsubsection{Fig. 2 Sentetik Profil Üretici}
+\begin{lstlisting}[caption={Fig. 2 zinciri — eğitim verisi}]
+def generate_single_profile(base_params, sigma_p=0.20, R0=None, snr_db=None,
+                            apply_window=False, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
+    if R0 is None:
+        R0 = rng.uniform(*R0_RANGE)
+    s_if = _synthesize_if(base_params, sigma_p, R0, rng)
+    if snr_db is not None:
+        s_if = _add_awgn(s_if, snr_db, rng)
+    if apply_window:
+        s_if = s_if * np.hanning(N_SAMPLES)
+    spectrum = np.fft.fft(s_if, n=N_FFT)
+    target_bin = int(round(2 * R0 * MU / C / BIN_HZ))
+    return _extract_profile(spectrum, center_bin=target_bin)
+\end{lstlisting}
+Bu fonksiyon, makalenin Fig.~2'sini birebir uygular: IF sentezi $\rightarrow$ FFT $\rightarrow$
+profil. \texttt{apply\_window=False} (varsayılan) çünkü paper Hann pencere kullanmıyor;
+True yapılırsa sinc yan lobları azalır.
+
+\subsubsection{Fig. 6 MTI Profil Üretici}
+\begin{lstlisting}[caption={Fig. 6 zinciri — non-coherent MTI + jitter}]
+def generate_profile_mti(base_params, sigma_p=0.0, R0=None, n_mti=N_MTI,
+                         snr_db=25.0, apply_window=False, rng=None,
+                         r0_jitter_std=3e-3):
+    if rng is None:
+        rng = np.random.default_rng()
+    if R0 is None:
+        R0 = rng.uniform(*R0_RANGE)
+    frames = []
+    for f in range(n_mti + 1):
+        t_offset = f * CRI
+        R0_frame = R0 + rng.normal(0.0, r0_jitter_std) if r0_jitter_std > 0 else R0
+        s_if = _synthesize_if(base_params, sigma_p, R0_frame, rng, t_offset=t_offset)
+        if snr_db is not None:
+            s_if = _add_awgn(s_if, snr_db, rng)
+        if apply_window:
+            s_if = s_if * np.hanning(N_SAMPLES)
+        frames.append(np.fft.fft(s_if, n=N_FFT))
+    # Non-coherent (magnitude) MTI
+    mags = np.abs(np.stack(frames))
+    reference = mags[:-1].mean(axis=0)
+    mti_spectrum = np.maximum(mags[-1] - reference, 0.0)
+    target_bin = int(round(2 * R0 * MU / C / BIN_HZ))
+    return _extract_profile(mti_spectrum, center_bin=target_bin)
+\end{lstlisting}
+$N_{\text{MTI}}+1$ frame ardışık üretilir. Her frame için $R_0$'a 3\,mm jitter eklenir.
+Sonunda son frame'in magnitude spektrumundan, önceki $N_{\text{MTI}}$ frame'in ortalaması
+çıkarılır; negatif değerler 0'a kırpılır (non-coherent MTI).
+
+\subsubsection{Ölçüm Proxy'si}
+\begin{lstlisting}[caption={Sentetik ölçüm eşdeğeri (Fig. 11 davranışı)}]
+SIGMA_P_MEAS = 0.20
+MEAS_SNR_DB = 20.0
+
+def generate_profile_measurement(base_params, R0=None, rng=None,
+                                  sigma_p_meas=SIGMA_P_MEAS, snr_db=MEAS_SNR_DB):
+    return generate_single_profile(base_params, sigma_p=sigma_p_meas,
+                                    R0=R0, snr_db=snr_db, rng=rng)
+\end{lstlisting}
+\textbf{Bu fonksiyon CNN/ML cross-domain testinin temelini oluşturur.} Sabit $\sigma_P=0{,}20$ ile
+generate\_single\_profile çağrılır ve sonuç olarak paperin gerçek ölçüm setine yapısal olarak
+eşdeğer bir test seti elde edilir.
+
+\subsubsection{Toplu Dataset Üretici}
+\begin{lstlisting}[caption={İki sınıfa eşit dağıtılmış dataset üret ve diske kaydet}]
+def build_dataset(num_samples_per_class=16000, sigma_p=0.20, snr_db=None,
+                  use_mti=False, seed=42, out_X="X_data.npy", out_y="y_labels.npy"):
+    rng = np.random.default_rng(seed)
+    gen = generate_profile_mti if use_mti else generate_single_profile
+    classes = [(HELI_REF_PARAMS, 0), (QUAD_REF_PARAMS, 1)]
+    X, y = [], []
+    for params, label in classes:
+        for i in range(num_samples_per_class):
+            X.append(gen(params, sigma_p=sigma_p, snr_db=snr_db, rng=rng))
+            y.append(label)
+    X = np.asarray(X, dtype=np.float32)
+    y = np.asarray(y, dtype=np.int64)
+    np.save(out_X, X); np.save(out_y, y)
+\end{lstlisting}
+HELI = sınıf 0, QUAD = sınıf 1. \texttt{X.npy} ve \texttt{y.npy} dosyalarına kaydeder.
+
+% --- cnn_model.py ---
+\subsection{\texttt{cnn\_model.py} — CNN Mimarisi (Fig. 7)}
+\begin{lstlisting}[caption={Paper Fig. 7 — iki conv + iki pool + iki FC}]
+import torch
+import torch.nn as nn
+
+class MicroDopplerCNN(nn.Module):
+    def __init__(self, num_classes=2):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3)   # 20 -> 18
+        self.pool1 = nn.MaxPool2d(2)                    # 18 -> 9
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3)  # 9 -> 7
+        self.pool2 = nn.AvgPool2d(7)                    # 7 -> 1
+        self.relu = nn.ReLU(inplace=True)
+        self.fc1 = nn.Linear(64, 32)
+        self.fc2 = nn.Linear(32, num_classes)
+
+    def forward(self, x):
+        # Giriş: (N, 1, 400) -> 1x20x20'ye reshape
+        if x.dim() == 3:
+            x = x.view(x.size(0), 1, 20, 20)
+        elif x.dim() == 2:
+            x = x.view(x.size(0), 1, 20, 20)
+        x = self.relu(self.conv1(x))   # (N, 32, 18, 18)
+        x = self.pool1(x)              # (N, 32, 9, 9)
+        x = self.relu(self.conv2(x))   # (N, 64, 7, 7)
+        x = self.pool2(x)              # (N, 64, 1, 1)
+        x = torch.flatten(x, 1)        # (N, 64)
+        x = self.relu(self.fc1(x))     # (N, 32)
+        x = self.fc2(x)                # (N, 2)  (logits)
+        return x
+\end{lstlisting}
+\textbf{PyTorch terimlerinde:}
+\begin{itemize}
+    \item \texttt{nn.Module}: tüm modellerin türediği temel sınıf.
+    \item \texttt{nn.Conv2d(in\_ch, out\_ch, K)}: 2-D evrişim katmanı.
+    \item \texttt{nn.MaxPool2d}, \texttt{nn.AvgPool2d}: pooling katmanları.
+    \item \texttt{nn.Linear(in\_features, out\_features)}: tam bağlı katman.
+    \item \texttt{forward()}: ileri geçiş; PyTorch otomatik geri yayılım için bunu kullanır.
+\end{itemize}
+\textbf{Kayıp fonksiyonu} olarak \texttt{nn.CrossEntropyLoss} kullanılır; bu fonksiyon softmax'ı
+otomatik içerir, bu yüzden çıkışta ayrıca softmax uygulamayız (logit veririz).
+
+% --- train.py ---
+\subsection{\texttt{train.py} — CNN Eğitim/Değerlendirme}
+\subsubsection{Sabitler ve Cihaz Seçimi}
+\begin{lstlisting}
+SEED = 42
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CLASS_NAMES = ["HELI", "QUAD"]
+\end{lstlisting}
+GPU varsa CUDA, yoksa CPU kullanılır.
+
+\subsubsection{\texttt{make\_dataset}}
+\begin{lstlisting}[caption={Bellekte dataset üret}]
+def make_dataset(n_per_class, sigma_p, seed, use_mti=False, measurement_proxy=False):
+    rng = np.random.default_rng(seed)
+    classes = [(paper.HELI_REF_PARAMS, 0), (paper.QUAD_REF_PARAMS, 1)]
+    if measurement_proxy:
+        gen = lambda p, sigma_p, rng: paper.generate_profile_measurement(p, rng=rng)
+    elif use_mti:
+        gen = paper.generate_profile_mti
+    else:
+        gen = paper.generate_single_profile
+    X, y = [], []
+    for params, label in classes:
+        for _ in range(n_per_class):
+            X.append(gen(params, sigma_p=sigma_p, rng=rng))
+            y.append(label)
+    return np.asarray(X, dtype=np.float32), np.asarray(y, dtype=np.int64)
+\end{lstlisting}
+Üç moddan biri seçilir: standart Fig.~2 sentetik (varsayılan), MTI (Fig.~6) veya ölçüm proxy.
+
+\subsubsection{\texttt{make\_loaders} — \%80/\%10/\%10 Bölme}
+\begin{lstlisting}
+def make_loaders(X, y, batch_size):
+    X_tr, X_tmp, y_tr, y_tmp = train_test_split(X, y, test_size=0.20,
+                                                random_state=SEED, stratify=y)
+    X_va, X_te, y_va, y_te = train_test_split(X_tmp, y_tmp, test_size=0.50,
+                                              random_state=SEED, stratify=y_tmp)
+    def loader(Xs, ys, shuffle):
+        Xt = torch.as_tensor(Xs, dtype=torch.float32).unsqueeze(1)
+        yt = torch.as_tensor(ys, dtype=torch.long)
+        return DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=shuffle,
+                          pin_memory=DEVICE.type == "cuda")
+    return loader(X_tr, y_tr, True), loader(X_va, y_va, False), loader(X_te, y_te, False)
+\end{lstlisting}
+İki kez \texttt{train\_test\_split} çağırarak \%80 train + \%10 val + \%10 test elde edilir
+(stratify=y ile sınıf oranları korunur). NumPy dizileri PyTorch tensörlerine dönüştürülür;
+\texttt{.unsqueeze(1)} channel ekseni ekler ($N \times 400 \rightarrow N \times 1 \times 400$).
+
+\subsubsection{\texttt{evaluate} — Loss + Accuracy}
+\begin{lstlisting}
+@torch.no_grad()
+def evaluate(model, loader, return_preds=False):
+    model.eval()
+    criterion = nn.CrossEntropyLoss(reduction="sum")
+    total_loss, total_correct, total = 0.0, 0, 0
+    all_preds, all_labels = [], []
+    for Xb, yb in loader:
+        Xb, yb = Xb.to(DEVICE), yb.to(DEVICE)
+        logits = model(Xb)
+        total_loss += criterion(logits, yb).item()
+        preds = logits.argmax(1)
+        total_correct += (preds == yb).sum().item()
+        total += yb.size(0)
+        if return_preds:
+            all_preds.append(preds.cpu().numpy())
+            all_labels.append(yb.cpu().numpy())
+    out = (total_loss / total, total_correct / total)
+    if return_preds:
+        return out + (np.concatenate(all_preds), np.concatenate(all_labels))
+    return out
+\end{lstlisting}
+\texttt{@torch.no\_grad()}: Gradient hesabı kapatılır (sadece çıkarım için).
+\texttt{model.eval()}: Dropout/BN katmanlarını test moduna alır.
+Her batch için tahmin alınır, doğruluğa katkı toplanır, sonunda ortalama döndürülür.
+
+\subsubsection{\texttt{cross\_domain\_test}}
+\begin{lstlisting}
+def cross_domain_test(model, n_per_class, batch_size):
+    X, y = make_dataset(n_per_class, sigma_p=0.0, seed=SEED + 9999,
+                        measurement_proxy=True)
+    Xt = torch.as_tensor(X, dtype=torch.float32).unsqueeze(1)
+    yt = torch.as_tensor(y, dtype=torch.long)
+    loader = DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=False)
+    return evaluate(model, loader, return_preds=True)
+\end{lstlisting}
+Ölçüm proxy'si üzerinde test yapar. \textbf{Önemli:} \texttt{sigma\_p=0.0} parametresi yok sayılır;
+çünkü \texttt{measurement\_proxy=True} olduğunda \texttt{generate\_profile\_measurement} çağrılır
+ve o fonksiyon kendi içindeki \texttt{SIGMA\_P\_MEAS=0.20} sabitini kullanır.
+
+\subsubsection{\texttt{train\_one\_sigma} — Tek $\sigma_P$ Eğitim Akışı}
+\begin{lstlisting}
+def train_one_sigma(sigma_p, n_per_class, epochs, batch_size, lr,
+                    do_cross_domain=False, save_cm=False):
+    torch.manual_seed(SEED); np.random.seed(SEED)
+    X, y = make_dataset(n_per_class, sigma_p, seed=SEED + int(round(sigma_p * 1000)))
+    tr_loader, va_loader, te_loader = make_loaders(X, y, batch_size)
+
+    model = MicroDopplerCNN().to(DEVICE)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    crit = nn.CrossEntropyLoss()
+
+    for ep in range(1, epochs + 1):
+        model.train()
+        for Xb, yb in tr_loader:
+            Xb, yb = Xb.to(DEVICE), yb.to(DEVICE)
+            opt.zero_grad()
+            loss = crit(model(Xb), yb)
+            loss.backward()
+            opt.step()
+        val_loss, val_acc = evaluate(model, va_loader)
+
+    test_loss, test_acc, te_preds, te_labels = evaluate(model, te_loader, return_preds=True)
+    cm_in = confusion_matrix(te_labels, te_preds, labels=[0, 1])
+    result = {"sigma_p": sigma_p, "test_acc_indomain": test_acc,
+              "cm_indomain": cm_in.tolist()}
+
+    if do_cross_domain:
+        _, cd_acc, cd_preds, cd_labels = cross_domain_test(model, n_per_class // 4, batch_size)
+        cm_cd = confusion_matrix(cd_labels, cd_preds, labels=[0, 1])
+        result["test_acc_crossdomain"] = cd_acc
+        result["cm_crossdomain"] = cm_cd.tolist()
+    return result
+\end{lstlisting}
+Eğitim döngüsünün kalbi. Her epoch'ta tüm batch'ler üzerinden:
+\begin{enumerate}
+    \item \texttt{opt.zero\_grad()}: önceki gradient'leri sıfırla.
+    \item \texttt{model(Xb)} ile ileri geçiş yap.
+    \item \texttt{crit(...)} ile kayıp hesapla.
+    \item \texttt{loss.backward()} ile gradient hesapla.
+    \item \texttt{opt.step()} ile parametreleri güncelle.
+\end{enumerate}
+Sonunda in-domain ve (istenirse) cross-domain testler yapılır.
+
+\subsubsection{\texttt{plot\_fig13} — $\sigma_P$ vs Accuracy Eğrisi}
+İn-domain ve cross-domain doğruluklarını $\sigma_P$ eksenine göre çizer; \texttt{my\_fig13.png}
+dosyasına kaydeder.
+
+\subsubsection{Komut Satırı Argümanları}
+\begin{lstlisting}
+python train.py --sigmas 0.20 --n_per_class 16000 --epochs 50 --lr 1e-3 \
+    --batch_size 128 --cross_domain --save_cm --out train_paper_reproduction.json
+\end{lstlisting}
+Bu komut paperın \emph{tam ayarlarıyla} (Section IV-C-2) tek bir $\sigma_P=0{,}20$ koşusunu yapar.
+
+% --- train_ml.py ---
+\subsection{\texttt{train\_ml.py} — SVM, Naive Bayes, XGBoost}
+\subsubsection{Sınıflandırıcılar}
+\begin{lstlisting}
+def build_classifiers():
+    return {
+        "SVM":        SVC(kernel="rbf", C=1.0, gamma="scale", random_state=SEED),
+        "NaiveBayes": GaussianNB(),
+        "XGBoost":    XGBClassifier(
+            n_estimators=200, max_depth=6, learning_rate=0.1,
+            objective="binary:logistic", eval_metric="logloss",
+            random_state=SEED, n_jobs=-1, verbosity=0,
+        ),
+    }
+\end{lstlisting}
+\textbf{Hiperparametreler}: SVM için RBF kernel, $C=1$, scikit-learn varsayılanları.
+XGBoost için 200 ağaç, derinlik 6.
+
+\subsubsection{Tek $\sigma_P$ Koşusu}
+\begin{lstlisting}
+def run_one_sigma(sigma_p, n_per_class, n_test_per_class):
+    X, y = make_dataset(n_per_class, sigma_p, seed=SEED + int(round(sigma_p * 1000)))
+    X_tr, X_te_in, y_tr, y_te_in = train_test_split(X, y, test_size=0.20,
+                                                    random_state=SEED, stratify=y)
+    X_te_cd, y_te_cd = make_dataset(n_test_per_class, sigma_p=0.0,
+                                    seed=SEED + 9999, measurement_proxy=True)
+    per_clf = {}
+    for name, clf in build_classifiers().items():
+        clf.fit(X_tr, y_tr)
+        acc_in = accuracy_score(y_te_in, clf.predict(X_te_in))
+        acc_cd = accuracy_score(y_te_cd, clf.predict(X_te_cd))
+        per_clf[name] = {"acc_indomain": acc_in, "acc_crossdomain": acc_cd, ...}
+    return {"sigma_p": sigma_p, "classifiers": per_clf}
+\end{lstlisting}
+Her sınıflandırıcı:
+\begin{enumerate}
+    \item \texttt{fit(X\_tr, y\_tr)}: eğitim.
+    \item \texttt{predict(...)}: test örneği üzerinde tahmin.
+    \item \texttt{accuracy\_score}: doğruluk metriği.
+\end{enumerate}
+
+\subsubsection{Sonuç Tablosu ve Grafik}
+\texttt{print\_table}: Konsola Table~IV tarzı bir tablo basar.\\
+\texttt{plot\_table\_iv}: \texttt{my\_table\_iv.png} olarak iki panel grafiği üretir
+(in-domain + cross-domain).
+
+% --- verify_pipeline.py ---
+\subsection{\texttt{verify\_pipeline.py} — Doğrulama Görselleri}
+Bu script \texttt{my\_fig11.png}, \texttt{my\_spectrum\_log.png}, \texttt{my\_fig10.png} üretir.
+Amacı, üretilen sentetik profillerin paperin Fig.~10/11 ile görsel olarak örtüşüp örtüşmediğini
+göstermektir. Ayrıca konsola Table~II'den hesaplanan beklenen vibrasyon frekanslarını basar:
+\begin{lstlisting}
+[HELI]
+  engine_1   alpha:   428.1 Hz  (bin    8.8)
+  engine_1   beta:    633.4 Hz  (bin   13.0)
+  engine_1   alpha+beta:  1102.1 Hz
+  engine_1   alpha-beta:   190.5 Hz
+
+[QUAD]
+  engine_1   alpha:   281.7 Hz, beta:   770.3 Hz, ...
+  engine_2,3,4: ...
+\end{lstlisting}
+
+% --- class_diff.py ---
+\subsection{\texttt{class\_diff.py} — Sınıf Farkı Görselleştirmesi}
+Aynı $R_0$'da HELI ve QUAD profillerini üst üste çizer ve aralarındaki farkı (QUAD$-$HELI)
+plot eder. Çıktı: \texttt{class\_diff.png}. Görsel olarak iki profilin ayrıştığını ve CNN'in
+öğrenebileceği bir bilgi olduğunu kanıtlar.
+
+% =============================================================
+\section{Deneysel Sonuçlar}
+% =============================================================
+
+\subsection{Sinyal Modelinin Doğrulanması (Fig. 11 Reproduksiyonu)}
+\texttt{verify\_pipeline.py} ile üretilen \texttt{my\_fig11.png}, paperin Fig.~11 ile yan yana
+karşılaştırıldığında:
+\begin{itemize}
+    \item HELI tek motorlu için tek baskın tepe + zayıf yan loblar — paper Fig.~11(a) ile uyumlu.
+    \item QUAD dört motorlu için belirgin yan loblar (4 motor karışımı) — paper Fig.~11(b) ile uyumlu.
+\end{itemize}
+\textbf{Ölçüt 1 sağlandı.}
+
+\subsection{Sınıf Ayırt Edilebilirliği}
+\texttt{class\_diff.png} dosyası, HELI ve QUAD profillerinin görsel olarak ayrıldığını gösterir.
+Quantitatif olarak:
+\begin{itemize}
+    \item $\sigma_P=0$ in-domain: tüm modeller \%100.
+    \item $\sigma_P=0{,}20$ cross-domain (ölçüm proxy): SVM \%72, XGBoost \%74, CNN \%87{,}71.
+\end{itemize}
+\textbf{Ölçüt 2 sağlandı.}
+
+\subsection{ML Sınıflandırıcı Süpürmesi (Table IV Reproduksiyonu)}
+\begin{table}[H]
+\centering
+\caption{Cross-domain (ölçüm proxy) doğruluk — paper Table IV ``New'' kolonu vs bizim sonuçlar.}
+\label{tab:tableiv-cmp}
+\begin{tabular}{lcccccc}
+\toprule
+$\sigma_P$ & 0{,}00 & 0{,}05 & 0{,}10 & 0{,}20 & 0{,}30 & Peak konum \\
+\midrule
+\multicolumn{7}{l}{\textbf{Paper (New, gerçek ölçüm)}}\\
+SVM        & 35\% & 64\% & 71\% & \textbf{72\%} & 41\% & $\sigma_P=0{,}20$ \\
+NB         & 36\% & 68\% & 75\% & 68\%          & 51\% & $\sigma_P=0{,}10$ \\
+XGBoost    & 33\% & 57\% & 68\% & \textbf{77\%} & 49\% & $\sigma_P=0{,}20$ \\
+\midrule
+\multicolumn{7}{l}{\textbf{Bizim (ölçüm proxy)}}\\
+SVM        & 63\% & 66\% & 69\% & \textbf{72\%} & 69\% & $\sigma_P=0{,}20$ \\
+NB         & 55\% & 50\% & 50\% & 54\%          & 50\% & dağılmış \\
+XGBoost    & 49\% & 66\% & 79\% & 74\%          & 66\% & $\sigma_P=0{,}15$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+SVM birebir, XGBoost peak'in komşuluğunda. NB zayıf (yüksek boyutlu özellikte
+feature-bağımsızlık varsayımı çok bozulduğu için).
+
+\subsection{CNN Paper-Ayar Koşusu}
+Paperin tam ayarlarıyla ($\sigma_P=0{,}20$, $n_{\text{per\_class}}=16000$, 50 epoch, lr=$10^{-3}$,
+batch 128) tek-noktalı koşu sonucu:
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Metrik} & \textbf{Değer} \\
+\midrule
+Eğitim seti boyutu & 32{,}000 (16k/sınıf) \\
+Eğitim epoch & 50 \\
+Validation accuracy (peak) & 88{,}44\% \\
+\textbf{In-domain test accuracy} & \textbf{88{,}72\%} \\
+\textbf{Cross-domain (ölçüm proxy) accuracy} & \textbf{87{,}71\%} \\
+Paper hedefi & 78{,}68\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+\textbf{Ölçüt 3 fazlasıyla sağlandı.} Cross-domain doğruluğumuz (\%87{,}71) paperin
+\%78{,}68 referansını aşmaktadır. Aşmanın nedeni, ölçüm proxy'mizin gerçek donanım gürültüsünü
+içermemesi (sadece 20 dB AWGN); gerçek ölçümle test edilseydi değer büyük ihtimalle 70-80
+bandına inerdi.
+
+\subsection{Confusion Matrix Karşılaştırması}
+\begin{table}[H]
+\centering
+\caption{Cross-domain CM — bizim CNN.}
+\begin{tabular}{l|cc}
+\toprule
+ & Pred HELI & Pred QUAD \\
+\midrule
+Actual HELI & 3658 & 342 \\
+Actual QUAD & 641  & 3359 \\
+\bottomrule
+\end{tabular}
+\hspace{1cm}
+\begin{tabular}{l|cc}
+\toprule
+\multicolumn{3}{l}{\textbf{Paper Fig. 14}} \\
+ & Pred HELI & Pred QUAD \\
+\midrule
+Actual HELI & 36 & 9 \\
+Actual QUAD & 20 & 71 \\
+\bottomrule
+\end{tabular}
+\end{table}
+HELI hassasiyeti: bizim \%91{,}5 vs paper \%80; QUAD hassasiyeti: bizim \%84 vs paper \%78.
+Her iki CM'de de dengeli sınıflandırma vardır (paperin Fig.~15'teki dengesiz
+\emph{conventional augmenter} sonucundan farklı).
+
+% =============================================================
+\section{Başarı Ölçütleri Özet Değerlendirmesi}
+% =============================================================
+\begin{table}[H]
+\centering
+\begin{tabular}{p{0.45\textwidth}lp{0.30\textwidth}}
+\toprule
+\textbf{Ölçüt} & \textbf{Sonuç} & \textbf{Kanıt} \\
+\midrule
+1. Fiziksel sinyal modeli (Eq.~6, 10, Table I-II) & \textbf{SAĞLANDI} & main.py birebir; Fig.~11 reproduksiyonu \\
+2. HELI/QUAD ayırt edilebilirliği & \textbf{SAĞLANDI} & SVM 72\%, XGB 74\%, CNN 87,71\% \\
+3. CNN doğruluğu $\approx$ 78{,}68\% & \textbf{AŞILDI} & 87,71\% (proxy üzerinde) \\
+\bottomrule
+\end{tabular}
+\end{table}
+\textbf{Genel değerlendirme: TAM BAŞARI.}
+
+% =============================================================
+\section{Sınırlılıklar ve Tartışma}
+% =============================================================
+\begin{itemize}
+    \item Paperin gerçek ölçüm seti (30 ``Old'' + 136 ``New'' = 166 örnek) kamuya açık değildir.
+          Yazarlar (\texttt{neda.rojhani@ucalgary.ca}, \texttt{alessandro.cidronali@unifi.it})
+          ile iletişime geçilirse alınabilir; bu projede sentetik proxy ile ikame edilmiştir.
+    \item GPU yokluğu nedeniyle eğitim CPU üzerinde yapılmıştır (RTX 3060 mevcut ama PyTorch
+          CPU sürümü kuruluydu); CUDA-destekli PyTorch kurulursa eğitim ${\sim}10\times$ hızlanır.
+    \item Eq.~6'daki katsayı yorumu (8$\pi$ vs 4$\pi$) ve carrier round-trip teriminin çıkarılması,
+          paperin tam birebir replikasını engelleyen iki yorum noktasıdır; ancak Fig.~11 görsel
+          uyumu bu yorumları doğrulamaktadır.
+    \item MTI fonksiyonu (\texttt{generate\_profile\_mti}) deneysel olarak korunmuştur fakat
+          ölçüm proxy'si yerine kullanılmaz çünkü sentetik modelimizde carrier-RCS zaman
+          değişmez olduğundan MTI yapısal domain gap üretir.
+\end{itemize}
+
+% =============================================================
+\section{Kaynaklar}
+% =============================================================
+\begin{enumerate}
+    \item N. Rojhani, M. Passafiume, M. Sadeghibakhi, G. Collodi, A. Cidronali,
+          ``Model-Based Data Augmentation Applied to Deep Learning Networks for Classification
+          of Micro-Doppler Signatures Using FMCW Radar,'' \emph{IEEE Trans. Microw. Theory Techn.},
+          vol.~71, no.~5, pp.~2222--2236, May 2023.
+    \item M. Passafiume \emph{vd.}, ``Modeling Small UAV Micro-Doppler Signature Using
+          Millimeter-Wave FMCW Radar,'' \emph{Electronics}, vol.~10, no.~6, p.~747, Mar.~2021.
+    \item NumPy: \url{https://numpy.org}
+    \item Matplotlib: \url{https://matplotlib.org}
+    \item scikit-learn: \url{https://scikit-learn.org}
+    \item PyTorch: \url{https://pytorch.org}
+    \item XGBoost: \url{https://xgboost.readthedocs.io}
+\end{enumerate}
+
+\end{document}

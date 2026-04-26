@@ -4,7 +4,8 @@
       "mcp__radar-sistemi__generate_synthetic_radar_data",
       "Bash(python -c ':*)",
       "Bash(rm -f table2_page.png table2_crop.png engine2_zoom.png)",
-      "Bash(python verify_pipeline.py)"
+      "Bash(python verify_pipeline.py)",
+      "Bash(pip install *)"
     ]
   }
 }
